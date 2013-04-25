@@ -1,0 +1,52 @@
+section signature
+
+-- Boolean operators
+const true    -- note that "const c" is only an abbreviation for "function c 0"
+const false
+infixl ∨ 10
+infixl ∧ 20
+
+-- Natural numbers
+const 0
+function s 1
+infixl = 35
+
+-- Lists
+const ε
+infixr · 50
+
+-- Operations on sets of natural numbers represented by lists
+infixl ∈ 40
+infixl ⊆ 30
+
+
+
+section rules
+
+-- Conjunction rules
+true ∧ X  →  X
+false ∧ X  →  false
+X ∧ true  →  X
+X ∧ false  →  false
+
+-- Disjunction rules
+true ∨ X  →  true
+false ∨ X  →  X
+X ∨ true  →  true
+X ∨ false  →  X
+
+-- Equality rules
+0 = 0  →  true
+s(X) = 0  →  false
+0 = s(X)  →  false
+s(X) = s(Y)  →  X = Y
+
+-- Membership rules
+X ∈ ε  →  false
+X ∈ Y · YS  →  X = Y ∨ X ∈ YS
+
+-- Set inclusion rules
+ε ⊆ YS  →  true
+X · XS ⊆ YS  →  X ∈ YS ∧ XS ⊆ YS
+
+
