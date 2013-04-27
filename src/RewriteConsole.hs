@@ -25,9 +25,13 @@ extractTerms trs s sep =
               
 helpMessage = "Available commands:" ++ concatMap ("\n  "++) commands ++ "\n"
     
-commands = ["rules", "term", "unify", "match", "rewrite", "trace", "normalise", 
+commands = ["help", "rules", "term", "unify", "match", "rewrite", "trace", "normalise", 
             "normalise_trace", "critical_pairs", "locally_confluent", "quit"]
 commandHelpMessages = [
+    "help <command>\n"++
+    "    Without an argument: displays a list of all available commands.\n" ++
+    "    With a command as an argument: displays a description of the given \n" ++
+    "    command.",
     "rules\n"++
     "    Prints a list of all the rules in the term rewriting system.\n",
     "term <term>\n"++
@@ -77,8 +81,8 @@ doShowRules trs = case trs of
 
 doShowTerm t = putStrLn (show t) >> return (Just t)
 
-doUnify trs Nothing = putStrLn ("Invalid parameters. Please type " ++
-                          "\"unify <term1> and <term2>\".") >> return Nothing
+doUnify _ Nothing = putStrLn ("Invalid parameters. Please type " ++
+                        "\"unify <term1> and <term2>\".") >> return Nothing
 doUnify trs (Just (t1,t2)) =
     case unify (t1,t2) of
         Left e -> putStrLn ("No unifiers: " ++ show e) >> return Nothing
@@ -88,8 +92,8 @@ doUnify trs (Just (t1,t2)) =
                                  "Corresponding term: " ++ prettyPrint trs t') >>
                       return (Just t')
                       
-doMatch trs Nothing = putStrLn ("Invalid parameters. Please type " ++
-                          "\"match <term1> to <term2>\".")
+doMatch _ Nothing = putStrLn ("Invalid parameters. Please type " ++
+                       "\"match <term1> to <term2>\".")
 doMatch trs (Just (t1,t2)) =
     case match (t1,t2) of
         Left e -> putStrLn ("No matchers: " ++ show e)
@@ -135,8 +139,8 @@ doLocallyConfluent trs verbose = putStr $
               let n1 = normalise trs t1
                   n2 = normalise trs t2
               in "Critical pair " ++ show i ++ ":\n" ++
-                 pretty s ++ " → " ++ pretty t1 ++ " →* " ++ pretty n1 ++ "\n" ++
-                 pretty s ++ " → " ++ pretty t2 ++ " →* " ++ pretty n2 ++  "\n" ++
+                 pretty s ++ " → " ++ pretty t1 ++ " →* " ++ pretty n1 ++ " (irreducible)\n" ++
+                 pretty s ++ " → " ++ pretty t2 ++ " →* " ++ pretty n2 ++  " (irreducible)\n" ++
                  if n1 == n2 then "Joinable\n\n" else "Not joinable\n\n"
           pretty t = prettyPrint trs t
 

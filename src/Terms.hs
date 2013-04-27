@@ -90,6 +90,7 @@ match p = match' p M.empty
                case M.lookup x σ of
                  Nothing -> Right (M.insert x t σ)
                  Just t' -> if t == t' then Right σ else Left (Clash t t')
+          match' (s, t@(Var _)) _ = Left (Clash s t)
                  
 matchMaybe :: (Term, Term) -> Maybe Subst
 matchMaybe p = either (const Nothing) Just (match p)
@@ -148,7 +149,7 @@ rewriteWith :: Rule -> Term -> [Term]
 rewriteWith rule@(Rule l r) t = 
    maybeToList ((\σ -> applySubst σ r) <$> matchMaybe (l, t)) ++
    case t of
-       Var x -> []
+       Var _ -> []
        Fun f args -> map (Fun f) (rewriteOneWith rule args)
 
 -- Performs a single rewrite step on the given term with any of the given rules
