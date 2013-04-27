@@ -49,23 +49,27 @@ infixrOpParser = fixOpParser "infixr" (\op a -> InfixOp op AssocRight a)
 opParser = try constParser <|> funOpParser <|> try prefixOpParser <|> 
                try postfixOpParser <|> 
                try infixlOpParser <|> infixrOpParser
+     
+space' = satisfy (\c -> isSpace c && c /= '\n')
+spaces' = many space'
+eol = spaces' >> char '\n' >> spaces
                
 sigParser = do
-    spaces
+    spaces'
     string "section"
-    skipMany1 space
+    skipMany1 space'
     string "signature"
-    spaces
-    ops <- many ((\x _ -> x) <$> opParser <*> spaces)
+    eol
+    ops <- many ((\x _ -> x) <$> opParser <*> eol)
     return ops
     
 rulesParser ops sig = do
-    spaces
+    spaces'
     string "section"
-    skipMany1 space
+    skipMany1 space'
     string "rules"
-    spaces
-    rules <- many ((\x _ -> x) <$> ruleParser ops sig <*> spaces)
+    eol
+    rules <- many ((\x _ -> x) <$> ruleParser ops sig <*> eol)
     return rules
     
 checkOpsConsistency [] = return ()
@@ -101,9 +105,9 @@ operationsToSignature ops = foldl f (Just M.empty) ops
           ins k v m = maybe (Just (M.insert k v m)) (const Nothing) (M.lookup k m)
           
 
-opToParser (InfixOp s assoc p) = Infix (spaces >> string s >> spaces >> return (\a b -> Fun s [a,b])) assoc
-opToParser (PrefixOp s p) = Prefix (spaces >> string s >> spaces >> return (\a -> Fun s [a]))
-opToParser (PostfixOp s p) = Postfix (spaces >> string s >> spaces >> return (\a -> Fun s [a]))
+opToParser (InfixOp s assoc p) = Infix (spaces' >> string s >> spaces' >> return (\a b -> Fun s [a,b])) assoc
+opToParser (PrefixOp s p) = Prefix (spaces' >> string s >> spaces' >> return (\a -> Fun s [a]))
+opToParser (PostfixOp s p) = Postfix (spaces' >> string s >> spaces' >> return (\a -> Fun s [a]))
 
 operationsToOpTable :: [Operation] -> [[Operator Char st Term]]
 operationsToOpTable ops = map (map opToParser) $ groupBy ((==) `on` opPrio) $ 
@@ -116,12 +120,12 @@ funNameParser = ((:) <$> satisfy (\c -> isLower c || isDigit c) <*> many alphaNu
 opNameParser = many1 (satisfy (validOperatorChar))
   
 funParser ops sig = do
-    spaces
+    spaces'
     f <- funNameParser <|> opNameParser
     guard (f /= "->")
-    spaces
+    spaces'
     args <- optionMaybe (between (char '(') (char ')') (sepBy (exprParser ops sig) (char ',')))
-    spaces
+    spaces'
     case M.lookup f sig of 
         Nothing -> fail ("No such function: " ++ f)
         Just arity -> do
@@ -132,26 +136,36 @@ funParser ops sig = do
                 else return (Fun f (F.concat args))
 
 varParser = do
-    spaces
+    spaces'
     x <- (:) <$> upper <*> many alphaNum 
-    spaces
+    spaces'
     return (Var x)
     
 parParser ops sig = do
-    spaces
+    spaces'
     x <- (between (char '(') (char ')') (exprParser ops sig)) 
-    spaces
+    spaces'
     return x
         
-termParser ops sig = try (parParser ops sig) <|> 
-                     try (funParser ops sig) <|>
-                     varParser
+termParser ops sig = do
+    spaces'
+    x <- try (parParser ops sig) <|> 
+         try (funParser ops sig) <|>
+         varParser
+    spaces'
+    return x
 
-exprParser ops sig = buildExpressionParser ops (termParser ops sig)
+exprParser ops sig = do
+    spaces'
+    x <- buildExpressionParser ops (termParser ops sig)
+    spaces'
+    return x
 
 ruleParser ops sig = do
     l <- exprParser ops sig
+    spaces
     try (string "->") <|> string "→"
+    spaces
     r <- exprParser ops sig
     return (Rule l r)
     

@@ -10,7 +10,7 @@ import qualified Confluence
 parseTRS = TRSParser.parseTRS
 parseTRSFile f = parseTRS <$> readFile f
 parseTerm (TRS.TRS ops _) = TRSParser.parseTerm ops
-parseRule = TRSParser.parseRule
+parseRule (TRS.TRS ops _) = TRSParser.parseRule ops
 match (s,t) = Terms.match (s,t)
 unify (s,t) = Terms.unify (s,t)
 rewrite (TRS.TRS _ rules) term = Terms.rewrite rules term
