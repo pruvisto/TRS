@@ -1,14 +1,12 @@
 module TRS where
 
-import qualified Data.Map as M
+import qualified Data.HashMap as M
 import Data.List
 import Data.Maybe
 import Text.ParserCombinators.Parsec.Expr (Assoc(AssocLeft,AssocRight))
 
-data Term = Var String | Fun String [Term] deriving (Eq, Ord)
-data Rule = Rule Term Term deriving (Eq, Ord)
-newtype Trace = Trace [Term]
-type Subst = M.Map String Term
+import Terms
+
 type Signature = M.Map String Integer
 data Operation = FunOp String Integer | PrefixOp String Integer | 
          PostfixOp String Integer | InfixOp String Assoc Integer
@@ -16,29 +14,9 @@ data Operation = FunOp String Integer | PrefixOp String Integer |
 data TRS = TRS [Operation] [Rule]
 
 constOp s = FunOp s 0
-         
-instance Show Term where
-  show (Var x) = x
-  show (Fun f []) = f
-  show (Fun f args) = f ++ "(" ++ intercalate "," (map show args) ++ ")"
-  
+
 instance Show Rule where
   show (Rule l r) = show l ++ " → " ++ show r
-  
-instance Show Trace where
-  show (Trace tr) = intercalate "\n  → " (map show (reverse tr))
-  
-instance Eq Trace where
-  Trace [] == Trace [] = True
-  Trace [] == _ = False
-  _ == Trace [] = False
-  Trace l1 == Trace l2 = head l1 == head l2
-  
-instance Ord Trace where
-  compare (Trace []) (Trace []) = EQ
-  compare (Trace []) _ = LT
-  compare _ (Trace []) = GT
-  compare (Trace l1) (Trace l2) = compare (head l1) (head l2)
   
 instance Eq Operation where
   FunOp s1 a1 == FunOp s2 a2 = (s1 == s2) && (a1 == a2)
@@ -62,6 +40,12 @@ instance Show Operation where
   show (PostfixOp s p) = "postfix " ++ s ++ " " ++ show p
   show (InfixOp s AssocLeft p) = "infixl " ++ s ++ " " ++ show p
   show (InfixOp s AssocRight p) = "infixr " ++ s ++ " " ++ show p
+
+
+isWellformed :: Signature -> Term -> Bool
+isWellformed a (Var _) = True
+isWellformed a (Fun f args) = M.lookup f a == Just (genericLength args) &&
+                                  all (isWellformed a) args
   
 opName :: Operation -> String
 opName (FunOp s _) = s
@@ -106,6 +90,11 @@ prettyPrint ops t = prettyPrint' t (buildOpMap ops)
                   "(" ++ prettyPrint' t m ++ ")" else prettyPrint' t m
               _ -> prettyPrint' t m
 
+prettyPrintRule ops (Rule l r) = prettyPrint ops l ++ " → " ++ prettyPrint ops r
 
 prettyPrintTrace ops (Trace tr) = intercalate "\n  → " (map (prettyPrint ops) (reverse tr))
+
+prettyPrintSubst ops σ = intercalate "\n" $ 
+    map (\(x,t) -> x ++ " ↦ " ++ prettyPrint ops t) $ M.toList σ
+
 

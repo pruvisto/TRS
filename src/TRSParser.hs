@@ -7,12 +7,13 @@ import Data.List
 import Data.Char
 import Data.Maybe
 import qualified Data.Foldable as F
-import qualified Data.Map as M
+import qualified Data.HashMap as M
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.Parsec.String
 
 import TRS
+import Terms
 
 {- Signature parser -}
 
@@ -100,9 +101,9 @@ operationsToSignature ops = foldl f (Just M.empty) ops
           ins k v m = maybe (Just (M.insert k v m)) (const Nothing) (M.lookup k m)
           
 
-opToParser (InfixOp s assoc p) = Infix (string s >> return (\a b -> Fun s [a,b])) assoc
-opToParser (PrefixOp s p) = Prefix (string s >> return (\a -> Fun s [a]))
-opToParser (PostfixOp s p) = Postfix (string s >> return (\a -> Fun s [a]))
+opToParser (InfixOp s assoc p) = Infix (spaces >> string s >> spaces >> return (\a b -> Fun s [a,b])) assoc
+opToParser (PrefixOp s p) = Prefix (spaces >> string s >> spaces >> return (\a -> Fun s [a]))
+opToParser (PostfixOp s p) = Postfix (spaces >> string s >> spaces >> return (\a -> Fun s [a]))
 
 operationsToOpTable :: [Operation] -> [[Operator Char st Term]]
 operationsToOpTable ops = map (map opToParser) $ groupBy ((==) `on` opPrio) $ 
