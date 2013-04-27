@@ -72,47 +72,71 @@ isGround :: Term -> Bool
 isGround (Var _) = False
 isGround (Fun _ args) = all isGround args
 
-match :: (Term, Term) -> Maybe Subst
+
+data UnificationError = OccursCheck String Term | Clash Term Term deriving Eq
+
+instance Show UnificationError where
+    show (OccursCheck x t) = "occurs check failed at " ++ x ++ " =!= " ++ show t
+    show (Clash s t) = "clash at " ++ show s ++ " =!= " ++ show t
+
+match :: (Term, Term) -> Either UnificationError Subst
 match p = match' p M.empty
-    where match' (Fun f fArgs, Fun g gArgs) σ
-            | f /= g || genericLength fArgs /= genericLength gArgs = Nothing
-            | otherwise = foldl (\σ t1t2 -> σ >>= match' t1t2) (Just σ) (zip fArgs gArgs)
+    where match' (s@(Fun f fArgs), t@(Fun g gArgs)) σ
+            | f /= g || genericLength fArgs /= genericLength gArgs = Left (Clash  s t)
+            | otherwise = foldl (\s t1t2 -> either Left (match' t1t2) s) (Right σ) (zip fArgs gArgs)
           match' (Var x, t) σ
-             | t == Var x = Just σ
+             | t == Var x = Right σ
              | otherwise = 
                case M.lookup x σ of
-                 Nothing -> Just (M.insert x t σ)
-                 Just t' -> if t == t' then Just σ else Nothing
-          match' _ _ = Nothing
+                 Nothing -> Right (M.insert x t σ)
+                 Just t' -> if t == t' then Right σ else Left (Clash t t')
+                 
+matchMaybe :: (Term, Term) -> Maybe Subst
+matchMaybe p = either (const Nothing) Just (match p)
 
 
+-- Propagates the assignment of the variable x to the term t to the 
+-- given constraint.
 updateConstr x t (t1,t2) = (substVar x t t1, substVar x t t2)
 
-unify' :: [(Term,Term)] -> Subst -> Maybe Subst
-unify' [] σ = Just σ
-unify' ((Var x, t@(Var y)):constrs) σ
+-- Finds the most general substitution σ that makes the lhs and rhs of all 
+-- constraints in the given list equal.
+unify' :: [(Term,Term)] -> Subst -> Either UnificationError Subst
+unify' [] σ = Right σ
+unify' ((Var x, t@(Var y)) : constrs) σ
     | x == y = unify' constrs σ    -- trivial constraint
     | genericLength x < genericLength y = unify' ((Var y, Var x):constrs) σ
     | otherwise = unify' (map (updateConstr x t) constrs) (updateSubst x t σ)
-unify' ((Var x, t):constrs) σ
-    | containsVar x t = Nothing    -- Occurs check
+unify' ((Var x, t) : constrs) σ
+    | containsVar x t = Left (OccursCheck x t)
     | otherwise = unify' (map (updateConstr x t) constrs) (updateSubst x t σ)
 unify' ((t, Var x):constrs) σ = unify' ((Var x,t):constrs) σ
-unify' ((Fun f fArgs, Fun g gArgs):constrs) σ
-    | f /= g || genericLength f /= genericLength g = Nothing   -- function clash
+unify' ((s@(Fun f fArgs), t@(Fun g gArgs)) : constrs) σ
+    | f /= g || genericLength f /= genericLength g = Left (Clash s t)
     | otherwise = unify' (zip fArgs gArgs ++ constrs) σ
 
-unify :: (Term, Term) -> Maybe Subst
+-- Finds the most general unifier σ for the given terms s and t, 
+-- i.e. a substitution such that σ(s) = σ(t).
+-- "Most general" means that for any other substituion σ' that also 
+-- satisfies σ'(s) = σ'(t), there is a substitution τ s.t. τσ = σ'
+-- On success, "Left σ" is returned, otherwise "Right e" with the 
+-- error e that caused the unification to fail.
+unify :: (Term, Term) -> Either UnificationError Subst
 unify p = unify' [p] M.empty
-          
-unifyAll :: [Term] -> Maybe Subst
+
+-- Same as unify, but returns Maybe instead of Either
+unifyMaybe :: (Term, Term) -> Maybe Subst
+unifyMaybe p = either (const Nothing) Just (unify p)
+
+-- Finds the most general unifier for all the terms in the given list
+unifyAll :: [Term] -> Either UnificationError Subst
 unifyAll ts = unifyAll' ts M.empty
     where unifyAll' (t1:t2:ts) σ =
-              do
-                σ <- unify' [(applySubst σ t1, applySubst σ t2)] σ
-                unifyAll' (t1:ts) σ
-          unifyAll' _ σ = Just σ
-          
+              case unify' [(applySubst σ t1, applySubst σ t2)] σ of
+                  Right σ -> unifyAll' (t1:ts) σ
+                  Left e -> Left e
+          unifyAll' _ σ = Right σ
+
 -- Given a rule r and a list of terms [t1,…,tn] picks an i, rewrites ti → ti'
 -- and returns [t1,…,ti',…,tn]
 rewriteOneWith :: Rule -> [Term] -> [[Term]]
@@ -122,7 +146,7 @@ rewriteOneWith rule ts = snd (foldr f ([], []) ts)
 -- Performs a single rewrite step on the given term with the given rule
 rewriteWith :: Rule -> Term -> [Term]
 rewriteWith rule@(Rule l r) t = 
-   maybeToList ((\σ -> applySubst σ r) <$> match (l, t)) ++
+   maybeToList ((\σ -> applySubst σ r) <$> matchMaybe (l, t)) ++
    case t of
        Var x -> []
        Fun f args -> map (Fun f) (rewriteOneWith rule args)
@@ -132,7 +156,7 @@ rewrite :: [Rule] -> Term -> [Term]
 rewrite rules t = rules >>= (\rule -> rewriteWith rule t)
 
 -- Returns all terms reachable from the given term by rewriting it with 
--- the given rules.
+-- the given rules, i.e. enumerates the →* relation
 rewriteStar :: [Rule] -> Term -> [Term]
 rewriteStar rules t = S.toList $ rewriteStar' (S.singleton t)
    where rewriteStar' ts = 
@@ -143,7 +167,8 @@ rewriteStar rules t = S.toList $ rewriteStar' (S.singleton t)
              case rewrite rules t of
                  [] -> (b, S.insert t ts')
                  ts'' -> (True, foldl (\ts' t -> S.insert t ts') ts' ts'')
-                 
+
+-- Enumerates the →* relation and shows a trace of rewrite steps for every term
 rewriteTrace :: [Rule] -> Term -> [Trace]
 rewriteTrace rules t = S.toList $ rewriteTrace' (S.singleton (Trace [t]))
    where rewriteTrace' ts = 
@@ -156,13 +181,18 @@ rewriteTrace rules t = S.toList $ rewriteTrace' (S.singleton (Trace [t]))
                  ts'' -> (True, foldl (\ts' t' -> 
                      S.insert (Trace (t':tr)) ts') ts' ts'')
 
-
+-- Eagerly applies rewrite steps until an irreducible term is obtained.
+-- If there is an infinitely descending chain starting at the given term, 
+-- this function may not terminate, even if there is a reachable irredicuble
+-- term.
 normalise :: [Rule] -> Term -> Term
 normalise rules t = 
     case rewrite rules t of
         [] -> t
         (t':_) -> normalise rules t'
-        
+
+-- Same as normalise, but also returns a trace of the rewrite steps 
+-- along the way
 normaliseTrace :: [Rule] -> Term -> Trace
 normaliseTrace rules t = Trace $ normaliseTrace' [t]
     where normaliseTrace' tr = 

@@ -31,7 +31,7 @@ criticalPairs' _ _ (Var _) _ _ = []
 criticalPairs' s@(Fun f args) r1 l2 r2 noRoot = 
         (if noRoot then [] else maybeToList critPair) ++ childrenCrits [] args
     where critPair = (\σ -> (applySubst σ s, applySubst σ r1, applySubst σ r2)) 
-                         <$> unify (s,l2)
+                         <$> unifyMaybe (s,l2)
           childrenCrits leftArgs [] = []
           childrenCrits leftArgs (x:rightArgs) = 
               [(Fun f (leftArgs ++ [s] ++ rightArgs), t1, 

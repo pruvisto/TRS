@@ -25,16 +25,19 @@ extractTerms trs s sep =
               
 helpMessage = "Available commands:" ++ concatMap ("\n  "++) commands ++ "\n"
     
-commands = ["rules", "unify", "match", "rewrite", "trace", "normalise", 
+commands = ["rules", "term", "unify", "match", "rewrite", "trace", "normalise", 
             "normalise_trace", "critical_pairs", "locally_confluent", "quit"]
 commandHelpMessages = [
     "rules\n"++
     "    Prints a list of all the rules in the term rewriting system.\n",
+    "term <term>\n"++
+    "    Parses the given term and displays its internal (non-pretty-printed) \n" ++
+    "    representation.\n",
     "unify <term1> and <term2>\n" ++
-    "    Prints the most general unifier σ for the given two terms t1 and t2, " ++
+    "    Prints the most general unifier σ for the given two terms t1 and t2, \n" ++
     "    if a unifier exists. The term σ(t1) = σ(t2) is also printed.",
     "match <term1> to <term2>\n" ++
-    "    Prints the matcher σ for the first given term t1 to the second one t2, " ++
+    "    Prints the matcher σ for the first given term t1 to the second one t2, \n" ++
     "    if it exists. A matcher is a substitution such that σ(t1) = t2.",
     "rewrite [<term>]\n"++
     "    Applies a single rewrite step to the given term and displays a list of\n"++
@@ -72,12 +75,14 @@ doHelp s = case elemIndex s commands of
 doShowRules trs = case trs of
     TRS.TRS _ rules -> putStrLn $ intercalate "\n" $ map (prettyPrintRule trs) rules
 
+doShowTerm t = putStrLn (show t) >> return (Just t)
+
 doUnify trs Nothing = putStrLn ("Invalid parameters. Please type " ++
                           "\"unify <term1> and <term2>\".") >> return Nothing
 doUnify trs (Just (t1,t2)) =
     case unify (t1,t2) of
-        Nothing -> putStrLn "No unifiers." >> return Nothing
-        Just σ -> let t' = Terms.applySubst σ t1 
+        Left e -> putStrLn ("No unifiers: " ++ show e) >> return Nothing
+        Right σ -> let t' = Terms.applySubst σ t1 
                    in putStrLn ("Most general unifier:\n" ++ 
                                  prettyPrintSubst trs σ ++ "\n\n" ++
                                  "Corresponding term: " ++ prettyPrint trs t') >>
@@ -87,8 +92,8 @@ doMatch trs Nothing = putStrLn ("Invalid parameters. Please type " ++
                           "\"match <term1> to <term2>\".")
 doMatch trs (Just (t1,t2)) =
     case match (t1,t2) of
-        Nothing -> putStrLn "No matchers."
-        Just σ -> putStrLn ("Matcher:\n" ++ prettyPrintSubst trs σ)
+        Left e -> putStrLn ("No matchers: " ++ show e)
+        Right σ -> putStrLn ("Matcher:\n" ++ prettyPrintSubst trs σ)
 
 doRewrite trs t = case ts of
     [] -> putStrLn "Term is already in normal form." >> return Nothing
@@ -145,9 +150,12 @@ commandLoop trs last = do
         "help":[] -> putStrLn helpMessage >> commandLoop trs last
         "help":cmd:_ -> doHelp cmd >> commandLoop trs last
         "rules":_ -> doShowRules trs >> commandLoop trs last
+        "term":[] -> case last of
+            Nothing -> putStrLn "No current result. Type 'term <term>'" >> commandLoop trs Nothing
+            Just t -> doShowTerm t >>= commandLoop trs
         "rewrite":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'rewrite <term>'" >> commandLoop trs Nothing
-            Just t -> doRewrite trs t  >>= commandLoop trs
+            Just t -> doRewrite trs t >>= commandLoop trs
         "trace":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'trace <term>'" >> commandLoop trs Nothing
             Just t -> doTrace trs t >>= commandLoop trs
@@ -157,6 +165,7 @@ commandLoop trs last = do
         "normalise_trace":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'normalise_trace <term>'" >> commandLoop trs Nothing
             Just t -> doNormaliseTrace trs t  >>= commandLoop trs
+        "term":_ -> doShowTerm (extractTerm trs str) >>= commandLoop trs
         "unify":_ -> doUnify trs (extractTerms trs str "and") >>= commandLoop trs
         "match":_ -> doMatch trs (extractTerms trs str "to") >> commandLoop trs last
         "rewrite":_ -> doRewrite trs (extractTerm trs str) >>= commandLoop trs
