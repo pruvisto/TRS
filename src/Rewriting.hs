@@ -4,13 +4,14 @@ import Control.Monad
 import Control.Applicative
 import qualified TRS
 import qualified Terms
-import qualified TRSParser
+import qualified Parser
 import qualified Confluence
 
-parseTRS = TRSParser.parseTRS
+parseTRS = Parser.parseTRS
 parseTRSFile f = parseTRS <$> readFile f
-parseTerm (TRS.TRS ops _) = TRSParser.parseTerm ops
-parseRule (TRS.TRS ops _) = TRSParser.parseRule ops
+parseTerm (TRS.TRS ops _) = Parser.parseTerm ops
+parseTermEither (TRS.TRS ops _) = Parser.parseTermEither ops
+parseRule (TRS.TRS ops _) = Parser.parseRule ops
 match (s,t) = Terms.match (s,t)
 unify (s,t) = Terms.unify (s,t)
 rewrite (TRS.TRS _ rules) term = Terms.rewrite rules term
@@ -24,4 +25,5 @@ prettyPrintSubst (TRS.TRS ops _) σ = TRS.prettyPrintSubst ops σ
 prettyPrintTrace (TRS.TRS ops _) tr = TRS.prettyPrintTrace ops tr
 criticalPairs (TRS.TRS _ rules) = Confluence.criticalPairs rules
 isWeaklyConfluent (TRS.TRS _ rules) = Confluence.isWeaklyConfluent rules
+
 

@@ -24,21 +24,23 @@ makeVarsDisjoint (Rule l1 r1, Rule l2 r2) =
           v1 = S.union (variablesHashSet l1) (variablesHashSet r1)
           v2 = S.union (variablesHashSet l2) (variablesHashSet r2)
           renameRuleVars f (Rule l r) = Rule (renameVars f l) (renameVars f r)
-    
-criticalPairs' :: Term -> Term -> Term -> Term -> Bool -> [(Term,Term,Term)]
-criticalPairs' (Var _) _ _ _ _ = []
-criticalPairs' _ _ (Var _) _ _ = []
-criticalPairs' s@(Fun f args) r1 l2 r2 noRoot = 
+   
+criticalPairs'' :: Term -> Term -> Term -> Term -> Bool -> [(Subst,Term)]
+criticalPairs'' (Var _) _ _ _ _ = []
+criticalPairs'' _ _ (Var _) _ _ = []
+criticalPairs'' s@(Fun f args) r1 l2 r2 noRoot = 
         (if noRoot then [] else maybeToList critPair) ++ childrenCrits [] args
-    where critPair = (\σ -> (applySubst σ s, applySubst σ r1, applySubst σ r2)) 
-                         <$> unifyMaybe (s,l2)
+    where critPair = (\σ -> (σ, r2)) <$> unifyMaybe (s,l2)
           childrenCrits leftArgs [] = []
           childrenCrits leftArgs (x:rightArgs) = 
-              [(Fun f (leftArgs ++ [s] ++ rightArgs), t1, 
-                Fun f (leftArgs ++ [t2] ++ rightArgs))
-                  | (s,t1,t2) <- criticalPairs' x r1 l2 r2 False] ++
+              [(σ, Fun f (leftArgs ++ [r2'] ++ rightArgs))
+                  | (σ, r2') <- criticalPairs'' x r1 l2 r2 False] ++
               childrenCrits (leftArgs ++ [x]) rightArgs
               
+criticalPairs' :: Term -> Term -> Term -> Term -> Bool -> [(Term, Term, Term)]
+criticalPairs' l1 r1 l2 r2 b = map f (criticalPairs'' l1 r1 l2 r2 b)
+    where f (σ,r2') = (applySubst σ l1, applySubst σ r1, applySubst σ r2')
+    
 criticalPairs :: [Rule] -> [(Term,Term,Term)]
 criticalPairs [] = []
 criticalPairs (r:rs) = criticalPairs'' r r True ++ 

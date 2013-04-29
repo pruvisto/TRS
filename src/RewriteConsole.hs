@@ -5,15 +5,16 @@ import Data.List
 import Data.Char
 import System.Environment  
 import Rewriting
+import Text.Parsec.Error
 import qualified Data.HashMap as M
 import qualified TRS
 import qualified Terms
 
-extractTerm trs s = parseTerm trs $ tail $ dropWhile (/=' ') s
+extractTerm trs s = parseTermEither trs $ tail $ dropWhile (/=' ') s
 
 extractTerms trs s sep =
     if isInfixOf sep' s' then 
-        Just (parseTerm trs s1, parseTerm trs s2)
+        Just (parseTermEither trs s1, parseTermEither trs s2)
     else
         Nothing
     where sep' = ' ' : sep ++ " "
@@ -76,14 +77,20 @@ doHelp s = case elemIndex s commands of
                Nothing -> putStrLn "No such command."
                Just i -> putStrLn ('\n' : commandHelpMessages !! i)
 
+doShowRules :: TRS.TRS -> IO ()
 doShowRules trs = case trs of
     TRS.TRS _ rules -> putStrLn $ intercalate "\n" $ map (prettyPrintRule trs) rules
 
-doShowTerm t = putStrLn (show t) >> return (Just t)
+doShowTerm :: Either ParseError Terms.Term -> IO (Maybe Terms.Term)
+doShowTerm (Left e) = putStrLn (show e) >> return Nothing
+doShowTerm (Right t) = putStrLn (show t) >> return (Just t)
 
+doUnify :: TRS.TRS -> Maybe (Either ParseError Terms.Term, Either ParseError Terms.Term) -> IO (Maybe Terms.Term)
 doUnify _ Nothing = putStrLn ("Invalid parameters. Please type " ++
                         "\"unify <term1> and <term2>\".") >> return Nothing
-doUnify trs (Just (t1,t2)) =
+doUnify _ (Just (Left e, _)) = putStrLn (show e) >> return Nothing
+doUnify _ (Just (_, Left e)) = putStrLn (show e) >> return Nothing
+doUnify trs (Just (Right t1, Right t2)) =
     case unify (t1,t2) of
         Left e -> putStrLn ("No unifiers: " ++ show e) >> return Nothing
         Right σ -> let t' = Terms.applySubst σ t1 
@@ -91,34 +98,46 @@ doUnify trs (Just (t1,t2)) =
                                  prettyPrintSubst trs σ ++ "\n\n" ++
                                  "Corresponding term: " ++ prettyPrint trs t') >>
                       return (Just t')
-                      
+
+doMatch :: TRS.TRS -> Maybe (Either ParseError Terms.Term, Either ParseError Terms.Term) -> IO ()
 doMatch _ Nothing = putStrLn ("Invalid parameters. Please type " ++
                        "\"match <term1> to <term2>\".")
-doMatch trs (Just (t1,t2)) =
+doMatch _ (Just (Left e, _)) = putStrLn (show e)
+doMatch _ (Just (_, Left e)) = putStrLn (show e)
+doMatch trs (Just (Right t1,Right t2)) =
     case match (t1,t2) of
         Left e -> putStrLn ("No matchers: " ++ show e)
         Right σ -> putStrLn ("Matcher:\n" ++ prettyPrintSubst trs σ)
 
-doRewrite trs t = case ts of
+doRewrite :: TRS.TRS -> Either ParseError Terms.Term -> IO (Maybe Terms.Term)
+doRewrite _ (Left e) = putStrLn (show e) >> return Nothing
+doRewrite trs (Right t) = case ts of
     [] -> putStrLn "Term is already in normal form." >> return Nothing
     (t:_) -> do putStrLn $ intercalate "\n" $ 
                     zipWith (\a b -> show a ++ ": " ++ b) 
                     [1..genericLength ts] (map (prettyPrint trs) ts)
                 return (Just t)
     where ts = rewrite trs t
-    
-doTrace trs t = case traces of
+
+doTrace :: TRS.TRS -> Either ParseError Terms.Term -> IO (Maybe Terms.Term)
+doTrace _ (Left e) = putStrLn (show e) >> return Nothing
+doTrace trs (Right t) = case traces of
     [] -> putStrLn "No result." >> return Nothing
     _ -> do putStrLn $ intercalate "\n\n" $ 
                 zipWith (\a b -> "Trace " ++ show a ++ ":\n" ++ b) 
                 [1..genericLength traces] (map (prettyPrintTrace trs) traces)
             return Nothing
     where traces = rewriteTrace trs t
-    
-doNormalise trs t = putStrLn (prettyPrint trs (normalise trs t)) >> return Nothing
 
-doNormaliseTrace trs t = putStrLn (prettyPrintTrace trs (normaliseTrace trs t)) >> return Nothing
+doNormalise :: TRS.TRS -> Either ParseError Terms.Term -> IO (Maybe Terms.Term)
+doNormalise _ (Left e) = putStrLn (show e) >> return Nothing
+doNormalise trs (Right t) = putStrLn (prettyPrint trs (normalise trs t)) >> return Nothing
 
+doNormaliseTrace :: TRS.TRS -> Either ParseError Terms.Term -> IO (Maybe Terms.Term)
+doNormaliseTrace _ (Left e) = putStrLn (show e) >> return Nothing
+doNormaliseTrace trs (Right t) = putStrLn (prettyPrintTrace trs (normaliseTrace trs t)) >> return Nothing
+
+doCriticalPairs :: TRS.TRS -> IO ()
 doCriticalPairs trs = 
     case cps of 
         [] -> putStrLn "No critical pairs."
@@ -128,22 +147,25 @@ doCriticalPairs trs =
                                      pretty s ++ " → " ++ pretty t1 ++ "\n" ++
                                      pretty s ++ " → " ++ pretty t2 ++ "\n\n"
           pretty t = prettyPrint trs t
-          
+
+doLocallyConfluent :: TRS.TRS -> Bool -> IO ()
 doLocallyConfluent trs verbose = putStr $ 
         (if verbose then concatMap formatPair $ zip [1..ncps] cps else []) ++
         ("System is " ++ (if isWeaklyConfluent trs then [] else "not ") ++
               "locally confluent.\n")
-    where cps = criticalPairs trs
+    where cps = concatMap (\(s,t1,t2) -> 
+                               let n1 = normalise trs t1
+                                   n2 = normalise trs t2
+                                in if n1 == n2 then [] else [(s,t1,t2,n1,n2)])
+                          (criticalPairs trs)
           ncps = genericLength cps
-          formatPair (i,(s,t1,t2)) = 
-              let n1 = normalise trs t1
-                  n2 = normalise trs t2
-              in "Critical pair " ++ show i ++ ":\n" ++
-                 pretty s ++ " → " ++ pretty t1 ++ " →* " ++ pretty n1 ++ " (irreducible)\n" ++
-                 pretty s ++ " → " ++ pretty t2 ++ " →* " ++ pretty n2 ++  " (irreducible)\n" ++
-                 if n1 == n2 then "Joinable\n\n" else "Not joinable\n\n"
+          formatPair (i,(s,t1,t2,n1,n2)) = 
+              "Unjoinable critical pair " ++ show i ++ ":\n" ++
+              pretty s ++ " → " ++ pretty t1 ++ " →* " ++ pretty n1 ++ " (irreducible)\n" ++
+              pretty s ++ " → " ++ pretty t2 ++ " →* " ++ pretty n2 ++  " (irreducible)\n\n"
           pretty t = prettyPrint trs t
 
+commandLoop :: TRS.TRS -> Maybe Terms.Term -> IO ()
 commandLoop trs last = do
     putStr "TRS> "
     hFlush stdout
@@ -156,19 +178,19 @@ commandLoop trs last = do
         "rules":_ -> doShowRules trs >> commandLoop trs last
         "term":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'term <term>'" >> commandLoop trs Nothing
-            Just t -> doShowTerm t >>= commandLoop trs
+            Just t -> doShowTerm (Right t) >>= commandLoop trs
         "rewrite":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'rewrite <term>'" >> commandLoop trs Nothing
-            Just t -> doRewrite trs t >>= commandLoop trs
+            Just t -> doRewrite trs (Right t) >>= commandLoop trs
         "trace":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'trace <term>'" >> commandLoop trs Nothing
-            Just t -> doTrace trs t >>= commandLoop trs
+            Just t -> doTrace trs (Right t) >>= commandLoop trs
         "normalise":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'normalise <term>'" >> commandLoop trs Nothing
-            Just t -> doNormalise trs t  >>= commandLoop trs
+            Just t -> doNormalise trs (Right t)  >>= commandLoop trs
         "normalise_trace":[] -> case last of
             Nothing -> putStrLn "No current result. Type 'normalise_trace <term>'" >> commandLoop trs Nothing
-            Just t -> doNormaliseTrace trs t  >>= commandLoop trs
+            Just t -> doNormaliseTrace trs (Right t)  >>= commandLoop trs
         "term":_ -> doShowTerm (extractTerm trs str) >>= commandLoop trs
         "unify":_ -> doUnify trs (extractTerms trs str "and") >>= commandLoop trs
         "match":_ -> doMatch trs (extractTerms trs str "to") >> commandLoop trs last
@@ -187,7 +209,7 @@ main = do
         putStrLn "Usage: rewrite <TRS file>"
     else do
         trs <- parseTRSFile (head args)
-        catch (commandLoop trs Nothing) (\e -> if isEOFError e then putStrLn "" else ioError e)
+        seq trs $ catch (commandLoop trs Nothing) (\e -> if isEOFError e then putStrLn "" else ioError e)
 
 
 

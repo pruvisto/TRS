@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+ Authors: Duncan Coutts, Anders Carlsson
+ Copyright (C) 2004, 2007 Duncan Coutts <duncan@haskell.org>
+ Copyright (C) 2004 Anders Carlsson <andersca@gnome.org>
+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Library General Public
+ License as published by the Free Software Foundation; either
+ version 2 of the License, or (at your option) any later version.
+
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Library General Public License for more details.
+
+ You should have received a copy of the GNU Library General Public
+ License along with this library; if not, write to the
+ Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ Boston, MA 02111-1307, USA.
+
+-->
+<language id="trs" _name="Trs" version="2.0" _section="Sources">
+  <metadata>
+    <property name="globs">*.trs</property>
+  </metadata>
+
+  <styles>
+    <style id="comment"      _name="Comment"      map-to="def:comment"/>
+    <style id="string"       _name="String"       map-to="def:variable"/>
+    <style id="variable"       _name="Variable" map-to="def:number"/>
+    <style id="keyword"      _name="Keyword"      map-to="def:keyword"/>
+  </styles>
+
+  <definitions>
+    <define-regex id="symbolchar">[^()A-Za-z0-9 \t\v\n\r]</define-regex>
+
+    <context id="line-comment" style-ref="comment" end-at-line-end="true" class="comment" class-disabled="no-spell-check">
+      <start>--</start>
+    </context>
+
+    <context id="variable" style-ref="variable">
+      <match>\b[A-Z][0-9a-zA-Z]*</match>
+    </context>
+
+    <context id="keyword" style-ref="keyword">
+      <prefix>(?&lt;![^\s;\(\)\`])</prefix>
+      <suffix>(?![^\s;\(\)\`])</suffix>
+      <keyword>section</keyword>
+      <keyword>signature</keyword>
+      <keyword>rule</keyword>
+      <keyword>rules</keyword>
+      <keyword>const</keyword>
+      <keyword>prefix</keyword>
+      <keyword>postfix</keyword>
+      <keyword>infixl</keyword>
+      <keyword>infixr</keyword>
+      <keyword>function</keyword>
+      <keyword>-></keyword>
+      <keyword>→</keyword>
+    </context>
+
+    <context id="string" style-ref="string" class="string">
+      <start>"</start>
+      <end>"</end>
+      <include>
+          <context ref="variable"/>
+      </include>
+    </context>
+
+    <context id="trs" class="no-spell-check">
+      <include>
+        <context ref="line-comment"/>
+        <context ref="keyword"/>
+        <context ref="string"/>
+      </include>
+    </context>
+
+  </definitions>
+</language>

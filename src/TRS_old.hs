@@ -89,7 +89,7 @@ prettyPrint ops t = prettyPrint' t (buildOpMap ops)
           escapeArg p t@(Fun f args) m =
             case (M.lookup (f, genericLength args) m) of
               Just (FunOp _ _) -> prettyPrint' t m
-              Just op -> if opPrio op <= p then 
+              Just op -> if opPrio op < p then 
                   "(" ++ prettyPrint' t m ++ ")" else prettyPrint' t m
               _ -> prettyPrint' t m
 

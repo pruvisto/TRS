@@ -1,52 +1,52 @@
 section signature
 
 -- Boolean operators
-const true    -- note that "const c" is only an abbreviation for "function c 0"
-const false
-infixl ∨ 10
-infixl ∧ 20
+const "true"    -- note that "const c" is only an abbreviation for "function c 0"
+const "false"
+infixl "∨" 10
+infixl "∧" 20
 
 -- Natural numbers
-const 0
-function s 1
-infixl = 35
+const "0"
+function "s" 1
+infixl "=" 35
 
 -- Lists
-const ε
-infixr · 50
+const "ε"
+infixr "·" 50
 
 -- Operations on sets of natural numbers represented by lists
-infixl ∈ 40
-infixl ⊆ 30
+infixl "∈" 40
+infixl "⊆" 30
 
 
 
 section rules
 
 -- Conjunction rules
-true ∧ X  →  X
-false ∧ X  →  false
-X ∧ true  →  X
-X ∧ false  →  false
+rule "true ∧ X  →  X"
+rule "false ∧ X  →  false"
+rule "X ∧ true  →  X"
+rule "X ∧ false  →  false"
 
 -- Disjunction rules
-true ∨ X  →  true
-false ∨ X  →  X
-X ∨ true  →  true
-X ∨ false  →  X
+rule "true ∨ X  →  true"
+rule "false ∨ X  →  X"
+rule "X ∨ true  →  true"
+rule "X ∨ false  →  X"
 
 -- Equality rules
-0 = 0  →  true
-s(X) = 0  →  false
-0 = s(X)  →  false
-s(X) = s(Y)  →  X = Y
+rule "0 = 0  →  true"
+rule "s(X) = 0  →  false"
+rule "0 = s(X)  →  false"
+rule "s(X) = s(Y)  →  X = Y"
 
 -- Membership rules
-X ∈ ε  →  false
-X ∈ Y · YS  →  X = Y ∨ X ∈ YS
+rule "X ∈ ε  →  false"
+rule "X ∈ Y · YS  →  X = Y ∨ X ∈ YS"
 
 -- Set inclusion rules
-ε ⊆ YS  →  true
-X · XS ⊆ YS  →  X ∈ YS ∧ XS ⊆ YS
+rule "ε ⊆ YS  →  true"
+rule "X · XS ⊆ YS  →  X ∈ YS ∧ XS ⊆ YS"
 
 

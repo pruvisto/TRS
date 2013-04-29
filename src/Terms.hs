@@ -84,9 +84,7 @@ match p = match' p M.empty
     where match' (s@(Fun f fArgs), t@(Fun g gArgs)) σ
             | f /= g || genericLength fArgs /= genericLength gArgs = Left (Clash  s t)
             | otherwise = foldl (\s t1t2 -> either Left (match' t1t2) s) (Right σ) (zip fArgs gArgs)
-          match' (Var x, t) σ
-             | t == Var x = Right σ
-             | otherwise = 
+          match' (Var x, t) σ =
                case M.lookup x σ of
                  Nothing -> Right (M.insert x t σ)
                  Just t' -> if t == t' then Right σ else Left (Clash t t')
@@ -113,7 +111,7 @@ unify' ((Var x, t) : constrs) σ
     | otherwise = unify' (map (updateConstr x t) constrs) (updateSubst x t σ)
 unify' ((t, Var x):constrs) σ = unify' ((Var x,t):constrs) σ
 unify' ((s@(Fun f fArgs), t@(Fun g gArgs)) : constrs) σ
-    | f /= g || genericLength f /= genericLength g = Left (Clash s t)
+    | f /= g || genericLength fArgs /= genericLength gArgs = Left (Clash s t)
     | otherwise = unify' (zip fArgs gArgs ++ constrs) σ
 
 -- Finds the most general unifier σ for the given terms s and t, 

@@ -1,0 +1,53 @@
+section signature
+
+const "0"
+function "s" 1
+
+infixl "+" 40
+infixl "-" 40
+prefix "-" 45
+infixl "*" 50
+
+const "x"
+function "deriv" 1
+
+section rules
+
+rule "X + 0 → X"
+rule "X + s(Y) → s(X) + Y"
+rule "s(X) - s(Y) → X - Y"
+rule "0 - Y → -Y"
+rule "0 * X → 0"
+rule "X * 0 → 0"
+rule "s(0) * X → X"
+rule "X * s(0) → X"
+rule "X + X → s(s(0)) * X"
+rule "Y*X + X → s(Y) * X"
+rule "X + Y*X → s(Y) * X"
+
+rule "X + (Y + Z) → (X + Y) + Z"
+rule "X + (Y - Z) → (X + Y) - Z"
+rule "X - (Y + Z) → (X - Y) - Z"
+rule "X - (Y - Z) → (X - Y) + Z"
+rule "X * Y + X * Z → X * (Y + Z)"
+rule "X * Z + Y * Z → (X + Y) * Z"
+rule "X * Y - X * Z → X * (Y - Z)"
+rule "X * Z - Y * Z → (X - Y) * Z"
+
+rule "-(-X) → X"
+rule "-(X + Y) → -X - Y"
+rule "-(X - Y) → Y - X"
+rule "X + (- Y) → X - Y"
+rule "X - (- Y) → X + Y"
+rule "(- X) + Y → Y - X"
+rule "(-X) * Y → -(X * Y)"
+rule "X * (-Y) → -(X * Y)"
+
+rule "deriv(0) → 0"
+rule "deriv(s(X)) → deriv(X)"
+rule "deriv(x) → s(0)"
+rule "deriv(-X) → -deriv(X)"
+rule "deriv(X + Y) → deriv(X) + deriv(Y)"
+rule "deriv(X - Y) → deriv(X) - deriv(Y)"
+rule "deriv(X * Y) → deriv(X)*Y + deriv(Y)*X"
+
